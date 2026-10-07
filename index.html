@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#163d36">
+<link rel="manifest" href="manifest.json">
+<title>Órion — Meu Plano</title>
+<style>
+:root{--bg:#f4f7f5;--card:#fff;--ink:#17332d;--muted:#687b76;--accent:#1f6658;--line:#dfe8e4}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:24px 18px 12px;background:linear-gradient(135deg,#163d36,#287866);color:white}
+header h1{margin:0;font-size:24px} header p{margin:6px 0 0;opacity:.85}
+main{max-width:760px;margin:auto;padding:14px 14px 90px}.card{background:var(--card);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 4px 18px #17332d12}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h2{font-size:18px;margin:0 0 10px}button,.btn{border:0;border-radius:12px;padding:11px 13px;background:#e7efec;color:var(--ink);font-weight:700}
+.primary{background:var(--accent);color:white}.progress{height:12px;background:#e2e9e6;border-radius:99px;overflow:hidden;margin:10px 0}.bar{height:100%;background:var(--accent);width:0}
+.meal{border-top:1px solid var(--line);padding:13px 0}.meal:first-of-type{border-top:0}.meal h3{margin:0 0 5px;font-size:16px}.foods{font-size:14px;color:var(--muted);line-height:1.55}
+.photo{width:72px;height:72px;object-fit:cover;border-radius:12px;margin-top:8px;display:none}.done{color:#237452;font-weight:700}
+input[type=file]{display:none}input[type=number]{width:100px;padding:10px;border:1px solid var(--line);border-radius:10px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;gap:8px;padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom));z-index:5}
+nav button{background:white}.active{background:#e1eee9!important;color:#174c41}
+.hidden{display:none}.small{font-size:12px;color:var(--muted)}select{padding:10px;border-radius:10px;border:1px solid var(--line);background:white}
+</style>
+</head>
+<body>
+<header><h1>Órion — Meu Plano</h1><p id="today"></p></header>
+<main>
+<section id="home">
+ <div class="card"><div class="row"><h2>💧 Minha água</h2><strong id="waterText">0 / 2500 ml</strong></div>
+ <div class="progress"><div class="bar" id="waterBar"></div></div>
+ <div class="row"><button onclick="addWater(200)">+200 ml</button><button onclick="addWater(300)">+300 ml</button><button onclick="addWater(500)">+500 ml</button><button onclick="resetWater()">Zerar</button></div></div>
+ <div class="card"><div class="row"><h2>🍽️ Refeições de hoje</h2><span id="score"></span></div><div id="meals"></div></div>
+</section>
+<section id="menu" class="hidden"><div class="card"><div class="row"><h2>📅 Cardápio semanal</h2><select id="daySelect" onchange="renderMenu()"></select></div><div id="menuMeals"></div></div></section>
+<section id="progress" class="hidden"><div class="card"><h2>⚖️ Meu progresso</h2><p>Registre seu peso quando quiser acompanhar a tendência.</p><div class="row"><input id="weight" type="number" step="0.1" placeholder="kg"><button class="primary" onclick="saveWeight()">Registrar</button></div><div id="weightHistory" style="margin-top:14px"></div></div></section>
+<section id="profile" class="hidden">
+<div class="card"><h2>🔔 Lembretes — V2.2</h2>
+<p>Refeições: <b>06:20 · 09:00 · 11:00 · 14:30 · 18:30 · 20:00</b></p>
+<p class="small">Água sugerida: 07:30 · 08:30 · 10:00 · 12:30 · 13:30 · 15:30 · 16:30 · 17:30 · 19:30.</p>
+<button class="primary" onclick="askNotifications()">Permitir notificações</button><button onclick="enablePush()">Ativar lembretes em segundo plano</button>
+<p id="notifStatus" class="small"></p>
+<p class="small">A V2.2 adiciona Web Push. Depois de permitir as notificações, toque em “Ativar lembretes em segundo plano”.</p></div>
+<div class="card"><h2>👤 Meu plano</h2><p class="small"><b>Versão instalada:</b> 2.2</p><p><b>Meta de água:</b> 2.500 ml/dia</p><p><b>Refeições:</b> 6 por dia</p><p class="small">As fotos ficam salvas somente neste navegador/aparelho nesta versão. A análise por IA não está ativada.</p><button onclick="exportData()">Exportar meus registros</button></div></section>
+</main>
+<nav><button class="active" onclick="tab('home',this)">Hoje</button><button onclick="tab('menu',this)">Cardápio</button><button onclick="tab('progress',this)">Progresso</button><button onclick="tab('profile',this)">Perfil</button></nav>
+<script>
+const mealTimes=["06:20","09:00","11:00","14:30","18:30","20:00"];
+const waterTimes=["07:30","08:30","10:00","12:30","13:30","15:30","16:30","17:30","19:30"];
+const plan = {
+"Domingo":[["Café da manhã","Pão francês 50 g; ovos 100 g; muçarela 25 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de queijo 50 g; café 150 ml"],["Almoço","Arroz 100 g; feijão 100 g; carne bovina assada 150 g; batata inglesa 100 g; salada 150 g"],["Lanche da tarde","Pão francês 50 g; carne moída ou frango desfiado 70 g; tomate 30 g"],["Jantar","Arroz 80 g; feijão 100 g; frango 130 g; cenoura ou repolho 100 g; salada 100 g"],["Ceia","Mamão 120 g"]],
+"Segunda-feira":[["Café da manhã","Pão francês 50 g; ovos mexidos 100 g; mamão 120 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de forma 50 g; muçarela 25 g; café 150 ml"],["Almoço","Arroz 100 g; feijão 100 g; frango 150 g; cenoura 100 g; alface + tomate 150 g"],["Lanche da tarde","Pão francês 50 g; carne moída magra 70 g; tomate 30 g"],["Jantar","Arroz 80 g; feijão 100 g; carne bovina magra 130 g; repolho 100 g; salada 100 g"],["Ceia","Banana 80 g"]],
+"Terça-feira":[["Café da manhã","Pão de forma 50 g; ovos mexidos 100 g; banana 80 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão francês 50 g; frango desfiado 60 g; tomate 30 g"],["Almoço","Arroz 100 g; feijão 100 g; carne moída 150 g; cenoura 100 g; alface + tomate 150 g"],["Lanche da tarde","Pão de forma 50 g; frango desfiado 70 g; requeijão light 15 g"],["Jantar","Arroz 80 g; feijão 100 g; frango 150 g; repolho 100 g; salada 100 g"],["Ceia","Maçã 120 g"]],
+"Quarta-feira":[["Café da manhã","Pão francês 50 g; omelete 2 ovos (100 g); muçarela 20 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de queijo 50 g; café 150 ml"],["Almoço","Arroz 100 g; feijão 100 g; bife bovino 150 g; batata inglesa 80 g; salada + cenoura 150 g"],["Lanche da tarde","Pão francês 50 g; frango desfiado 70 g; requeijão light 15 g"],["Jantar","Arroz 80 g; feijão 100 g; carne moída 130 g; cenoura 100 g; salada 100 g"],["Ceia","Mamão 120 g"]],
+"Quinta-feira":[["Café da manhã","Pão de forma 50 g; ovos mexidos 100 g; muçarela 20 g; melão 120 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão francês 50 g; muçarela 25 g; tomate 30 g"],["Almoço","Arroz 100 g; feijão 100 g; frango assado 150 g; repolho 100 g; alface + tomate 150 g"],["Lanche da tarde","Pão de queijo 50 g; frango desfiado 60 g"],["Jantar","Arroz 80 g; feijão 100 g; bife bovino 130 g; cenoura 100 g; salada 100 g"],["Ceia","Banana 80 g"]],
+"Sexta-feira":[["Café da manhã","Pão francês 50 g; ovos mexidos 100 g; banana 80 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de forma 50 g; muçarela 25 g; tomate 30 g"],["Almoço","Arroz 100 g; feijão 100 g; carne bovina em cubos 150 g; cenoura 100 g; salada 150 g"],["Lanche da tarde","Pão francês 50 g; carne moída 70 g; tomate 30 g"],["Jantar","Arroz 80 g; feijão 100 g; frango 150 g; repolho 100 g; salada 100 g"],["Ceia","Maçã 120 g"]],
+"Sábado":[["Café da manhã","Pão francês 50 g; ovos 100 g; muçarela 20 g; mamão 120 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de queijo 50 g; café 150 ml"],["Almoço","Arroz 100 g; feijão 100 g; bife bovino 150 g; batata inglesa 100 g; salada 150 g"],["Lanche da tarde","Pão de forma 50 g; frango desfiado 70 g; requeijão light 15 g"],["Jantar","Arroz 80 g; feijão 100 g; carne moída 130 g; cenoura + repolho 100 g; salada 100 g"],["Ceia","Melão 120 g"]]
+};
+const days=Object.keys(plan); const now=new Date(); const day=days[now.getDay()]; const dateKey=now.toISOString().slice(0,10);
+document.getElementById("today").textContent=day+" • "+now.toLocaleDateString("pt-BR");
+function state(){return JSON.parse(localStorage.getItem("orion")||"{}")} function put(s){localStorage.setItem("orion",JSON.stringify(s))}
+function addWater(n){let s=state();s.water=s.water||{};s.water[dateKey]=(s.water[dateKey]||0)+n;put(s);renderWater()}
+function resetWater(){let s=state();s.water=s.water||{};s.water[dateKey]=0;put(s);renderWater()}
+function renderWater(){let v=((state().water||{})[dateKey]||0);waterText.textContent=v+" / 2500 ml";waterBar.style.width=Math.min(100,v/25)+"%"}
+function renderMeals(){
+ let s=state(), done=(s.done||{})[dateKey]||{}, photos=(s.photos||{})[dateKey]||{}; meals.innerHTML="";
+ plan[day].forEach((m,i)=>{let d=document.createElement("div");d.className="meal";d.innerHTML=`<div class="small">🕒 ${mealTimes[i]}</div><h3>${done[i]?"✓ ":""}${m[0]}</h3><div class="foods">${m[1]}</div><label class="btn ${done[i]?"":"primary"}" for="p${i}">📸 ${done[i]?"Trocar foto":"Registrar meu prato"}</label><input id="p${i}" type="file" accept="image/*" capture="environment"><img id="img${i}" class="photo">`;meals.appendChild(d);
+ let inp=d.querySelector("input"),img=d.querySelector("img");if(photos[i]){img.src=photos[i];img.style.display="block"}
+ inp.onchange=e=>savePhoto(i,e.target.files[0]);
+ });score.textContent=Object.keys(done).length+"/6 realizadas"
+}
+function savePhoto(i,file){if(!file)return;let r=new FileReader();r.onload=()=>{let s=state();s.done=s.done||{};s.done[dateKey]=s.done[dateKey]||{};s.done[dateKey][i]=true;s.photos=s.photos||{};s.photos[dateKey]=s.photos[dateKey]||{};s.photos[dateKey][i]=r.result;try{put(s)}catch(e){alert("O armazenamento do navegador ficou cheio. Use fotos menores ou exporte os registros.");}renderMeals()};r.readAsDataURL(file)}
+function tab(id,b){document.querySelectorAll("main>section").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active")}
+daySelect.innerHTML=days.map(d=>`<option ${d==day?"selected":""}>${d}</option>`).join("");
+function renderMenu(){menuMeals.innerHTML=plan[daySelect.value].map((m,i)=>`<div class="meal"><div class="small">🕒 ${mealTimes[i]}</div><h3>${m[0]}</h3><div class="foods">${m[1]}</div></div>`).join("")}
+function saveWeight(){let v=parseFloat(weight.value);if(!v)return;let s=state();s.weights=s.weights||[];s.weights.push({date:new Date().toLocaleDateString("pt-BR"),value:v});put(s);weight.value="";renderWeights()}
+function renderWeights(){let a=(state().weights||[]).slice().reverse();weightHistory.innerHTML=a.length?a.map(x=>`<div class="meal"><b>${x.value.toFixed(1)} kg</b> <span class="small">— ${x.date}</span></div>`).join(""):"<span class=small>Nenhum peso registrado ainda.</span>"}
+function exportData(){let blob=new Blob([JSON.stringify(state(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="orion-meu-plano-backup.json";a.click()}
+
+async function askNotifications(){
+ if(!("Notification" in window)){notifStatus.textContent="Notificações não estão disponíveis neste modo do navegador.";return}
+ const p=await Notification.requestPermission();
+ notifStatus.textContent=p==="granted"?"✓ Notificações permitidas.":"Permissão não concedida.";
+}
+const VAPID_PUBLIC_KEY="BGIw6x8C-6BHYMawmIt8E4L_pY9aM6tMovvTfCxoTjnWEdMphHWtvuxyT162KDLX5xwm525WMb9hCt8M4fHhfzg";
+function urlBase64ToUint8Array(s){const p="=".repeat((4-s.length%4)%4),b=(s+p).replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from([...atob(b)].map(c=>c.charCodeAt(0)))}
+async function enablePush(){try{if(!("serviceWorker" in navigator)||!("PushManager" in window)){notifStatus.textContent="Web Push não está disponível neste aparelho/modo.";return}if(Notification.permission!=="granted"){await askNotifications();if(Notification.permission!=="granted")return}notifStatus.textContent="Ativando lembretes…";const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});const r=await fetch("/.netlify/functions/subscribe",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(sub)});if(!r.ok)throw new Error("falha no servidor");notifStatus.textContent="✓ Lembretes em segundo plano ativados."}catch(e){notifStatus.textContent="Não foi possível ativar o Web Push: "+e.message}}
+function hm(){const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+function checkReminders(){
+ if(!("Notification" in window)||Notification.permission!=="granted")return;
+ const t=hm(), s=state(), k=dateKey+"-"+t; s.alerted=s.alerted||{};
+ if(s.alerted[k])return;
+ const mi=mealTimes.indexOf(t);
+ if(mi>=0){new Notification("Órion — Meu Plano",{body:"Hora de "+plan[day][mi][0].toLowerCase()+". Confira seu cardápio. 🍽️"});s.alerted[k]=1;put(s)}
+ else if(waterTimes.includes(t)){new Notification("Órion — Meu Plano",{body:"Hora de beber água. 💧 Registre no Órion."});s.alerted[k]=1;put(s)}
+}
+setInterval(checkReminders,30000);
+renderWater();renderMeals();renderMenu();renderWeights();
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js?v=22",{updateViaCache:"none"}).then(reg=>reg.update()).catch(()=>{});
+  let reloading=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!reloading){reloading=true;location.reload()}});
+}
+</script></body></html>

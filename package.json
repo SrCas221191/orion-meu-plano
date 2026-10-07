@@ -1,0 +1,1 @@
+{"name":"orion-meu-plano","private":true,"version":"2.2.0","type":"module","dependencies":{"@netlify/blobs":"^10.0.0","web-push":"^3.6.7"}}
