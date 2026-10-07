@@ -81,7 +81,7 @@ async function askNotifications(){
  const p=await Notification.requestPermission();
  notifStatus.textContent=p==="granted"?"✓ Notificações permitidas.":"Permissão não concedida.";
 }
-const VAPID_PUBLIC_KEY="";
+const VAPID_PUBLIC_KEY="BIbf5qzWZrea1AlKnDNABkH_nghVzGa0ULr80GInQKwg3Sq4HkHJPnCJLOxPg_KQMOXyridwFLxBACrOX4Xzs_c";
 function urlBase64ToUint8Array(s){const p="=".repeat((4-s.length%4)%4),b=(s+p).replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from([...atob(b)].map(c=>c.charCodeAt(0)))}
 async function enablePush(){
   try{
