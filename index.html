@@ -83,8 +83,39 @@ async function askNotifications(){
 }
 const VAPID_PUBLIC_KEY="";
 function urlBase64ToUint8Array(s){const p="=".repeat((4-s.length%4)%4),b=(s+p).replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from([...atob(b)].map(c=>c.charCodeAt(0)))}
-async function enablePush(){try{if(!("serviceWorker" in navigator)||!("PushManager" in window)){notifStatus.textContent="Web Push não está disponível neste aparelho/modo.";return}if(Notification.permission!=="granted"){await askNotifications();if(Notification.permission!=="granted")return}notifStatus.textContent="Ativando lembretes…";const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});const r=await fetch("/.netlify/functions/subscribe",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(sub)});if(!r.ok)throw new Error("falha no servidor");notifStatus.textContent="✓ Lembretes em segundo plano ativados."}catch(e){notifStatus.textContent="Não foi possível ativar o Web Push: "+e.message}}
-function hm(){const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+async function enablePush(){
+  try{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)){
+      notifStatus.textContent="Web Push não está disponível.";
+      return;
+    }
+
+    const reg=await navigator.serviceWorker.ready;
+
+    const antiga=await reg.pushManager.getSubscription();
+    if(antiga){
+      await antiga.unsubscribe();
+    }
+
+    const sub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+
+    const r=await fetch("/.netlify/functions/subscribe",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(sub)
+    });
+
+    if(!r.ok) throw new Error(await r.text());
+
+    notifStatus.textContent="✓ Lembretes em segundo plano ativados.";
+  }catch(e){
+    console.error(e);
+    notifStatus.textContent="Não foi possível ativar o Web Push: "+e.message;
+  }
+}function hm(){const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
 function checkReminders(){
  if(!("Notification" in window)||Notification.permission!=="granted")return;
  const t=hm(), s=state(), k=dateKey+"-"+t; s.alerted=s.alerted||{};
