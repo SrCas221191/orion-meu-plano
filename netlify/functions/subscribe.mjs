@@ -1,2 +1,51 @@
 import { getStore } from "@netlify/blobs";
-export const handler=async(event)=>{if(event.httpMethod!=="POST")return{statusCode:405,body:"Method not allowed"};try{const sub=JSON.parse(event.body||"{}");if(!sub.endpoint)return{statusCode:400,body:"Invalid subscription"};await getStore("orion-push").setJSON("primary",sub);return{statusCode:200,body:JSON.stringify({ok:true})}}catch(e){console.error("ERRo SUBSCRIBE:",E);return{statusCode:500,body:e.message}}};
+
+export const handler = async (event) => {
+  if (event.httpMethod !== "POST") {
+    return {
+      statusCode: 405,
+      body: "Method not allowed"
+    };
+  }
+
+  try {
+    const subscription = JSON.parse(event.body || "{}");
+
+    if (!subscription.endpoint) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          ok: false,
+          error: "Subscription inválida"
+        })
+      };
+    }
+
+    const store = getStore("orion-push");
+
+    await store.setJSON("primary", subscription);
+
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ok: true
+      })
+    };
+  } catch (error) {
+    console.error("SUBSCRIBE_ERROR:", error);
+
+    return {
+      statusCode: 500,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ok: false,
+        error: error?.message || String(error)
+      })
+    };
+  }
+};
