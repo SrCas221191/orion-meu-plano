@@ -38,6 +38,18 @@ nav button{background:white}.active{background:#e1eee9!important;color:#174c41}
   <button class="primary" onclick="openMenuEditor()">Editar cardápio</button>
   <div id="menuEditor" class="hidden"></div>
 </div>
+<div class="card">
+  <h2>✨ Criar meu cardápio personalizado</h2>
+  <p class="small">
+    Monte um cardápio semanal de acordo com seu corpo, preferências e objetivo.
+  </p>
+
+  <button class="primary" onclick="openPlanCreator()">
+    ✨ Criar meu cardápio
+  </button>
+
+  <div id="planCreator" class="hidden"></div>
+</div>
 <section id="progress" class="hidden"><div class="card"><h2>⚖️ Meu progresso</h2><p>Registre seu peso quando quiser acompanhar a tendência.</p><div class="row"><input id="weight" type="number" step="0.1" placeholder="kg"><button class="primary" onclick="saveWeight()">Registrar</button></div><div id="weightHistory" style="margin-top:14px"></div></div></section>
 <section id="profile" class="hidden">
 <div class="card"><h2>🔔 Lembretes — V2.2</h2>
@@ -149,7 +161,397 @@ function saveMenuEditor(){
 function saveWeight(){let v=parseFloat(weight.value);if(!v)return;let s=state();s.weights=s.weights||[];s.weights.push({date:new Date().toLocaleDateString("pt-BR"),value:v});put(s);weight.value="";renderWeights()}
 function renderWeights(){let a=(state().weights||[]).slice().reverse();weightHistory.innerHTML=a.length?a.map(x=>`<div class="meal"><b>${x.value.toFixed(1)} kg</b> <span class="small">— ${x.date}</span></div>`).join(""):"<span class=small>Nenhum peso registrado ainda.</span>"}
 function exportData(){let blob=new Blob([JSON.stringify(state(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="orion-meu-plano-backup.json";a.click()}
+function openPlanCreator(){
+  const box=document.getElementById("planCreator");
+  box.classList.remove("hidden");
 
+  box.innerHTML=`
+    <h3>🧑‍🍳 Vamos montar seu plano</h3>
+
+    <label>Idade</label>
+    <input id="pcAge" type="number" min="18" placeholder="Ex.: 34">
+
+    <label>Peso atual (kg)</label>
+    <input id="pcWeight" type="number" step="0.1" placeholder="Ex.: 105">
+
+    <label>Altura (cm)</label>
+    <input id="pcHeight" type="number" placeholder="Ex.: 186">
+
+    <label>Sexo para cálculo energético</label>
+    <select id="pcSex">
+      <option value="male">Masculino</option>
+      <option value="female">Feminino</option>
+    </select>
+
+    <label>Nível de atividade</label>
+    <select id="pcActivity">
+      <option value="1.2">Sedentário</option>
+      <option value="1.375">Levemente ativo</option>
+      <option value="1.55">Moderadamente ativo</option>
+      <option value="1.725">Muito ativo</option>
+    </select>
+
+    <label>Meta de perda de peso</label>
+    <select id="pcGoal">
+      <option value="0.25">0,25 kg por semana</option>
+      <option value="0.5" selected>0,5 kg por semana</option>
+      <option value="0.75">0,75 kg por semana</option>
+      <option value="1">1 kg por semana</option>
+    </select>
+
+    <label>🍚 Alimentos que quero consumir</label>
+    <textarea id="pcLikes"
+      placeholder="Ex.: arroz, feijão, frango, carne bovina, pão, banana..."></textarea>
+
+    <label>🚫 Alimentos que não quero consumir</label>
+    <textarea id="pcDislikes"
+      placeholder="Ex.: peixe, iogurte, aveia, brócolis..."></textarea>
+
+    <button class="primary" onclick="createPersonalPlan()">
+      ✨ Criar meu cardápio semanal
+    </button>
+
+    <p id="planCreatorStatus" class="small"></p>
+  `;
+}
+function createPersonalPlan(){
+  const age=parseInt(document.getElementById("pcAge").value);
+  const weight=parseFloat(document.getElementById("pcWeight").value);
+  const height=parseFloat(document.getElementById("pcHeight").value);
+  const sex=document.getElementById("pcSex").value;
+  const activity=parseFloat(document.getElementById("pcActivity").value);
+  const goal=parseFloat(document.getElementById("pcGoal").value);
+  const likes=document.getElementById("pcLikes").value.trim();
+  const dislikes=document.getElementById("pcDislikes").value.trim();
+  const status=document.getElementById("planCreatorStatus");
+
+  if(!age || !weight || !height){
+    status.textContent="⚠️ Preencha idade, peso e altura.";
+    return;
+  }
+
+  if(age<18){
+    status.textContent="⚠️ Este recurso foi desenvolvido para adultos.";
+    return;
+  }
+
+  let bmr;
+  if(sex==="male"){
+    bmr=(10*weight)+(6.25*height)-(5*age)+5;
+  }else{
+    bmr=(10*weight)+(6.25*height)-(5*age)-161;
+  }
+
+  const maintenance=Math.round(bmr*activity);
+  const requestedDeficit=Math.round((goal*7700)/7);
+
+  /*
+    Proteção: o aplicativo não força uma meta agressiva.
+    O déficit fica limitado para evitar transformar
+    uma meta escolhida em uma prescrição extrema.
+  */
+  const deficit=Math.min(requestedDeficit,750);
+  let calories=maintenance-deficit;
+
+  const minimum=sex==="male" ? 1500 : 1200;
+  calories=Math.max(calories,minimum);
+
+  const profile={
+    age,
+    weight,
+    height,
+    sex,
+    activity,
+    goal,
+    likes,
+    dislikes,
+    maintenance,
+    calories
+  };
+
+  let s=state();
+  s.planProfile=profile;
+  put(s);
+
+  status.innerHTML=
+    "✅ Perfil calculado.<br>"+
+    "Meta energética estimada: <b>"+calories+" kcal/dia</b>.<br>"+
+    "Agora vamos montar as refeições dos 7 dias.";
+
+    showPlanPreview(profile);
+}
+const FOOD_DB = {
+  carbs: [
+    {name:"arroz", portion:"100 g"},
+    {name:"batata inglesa", portion:"150 g"},
+    {name:"mandioca", portion:"120 g"},
+    {name:"macarrão", portion:"100 g"},
+    {name:"pão francês", portion:"50 g"},
+    {name:"pão de forma", portion:"50 g"},
+    {name:"pão de queijo", portion:"50 g"}
+  ],
+
+  legumes: [
+    {name:"feijão", portion:"100 g"},
+    {name:"lentilha", portion:"100 g"}
+  ],
+
+  proteins: [
+    {name:"frango", portion:"150 g"},
+    {name:"carne bovina", portion:"130 g"},
+    {name:"carne suína", portion:"130 g"},
+    {name:"ovos", portion:"100 g"},
+    {name:"atum", portion:"100 g"},
+    {name:"peixe", portion:"150 g"},
+    {name:"muçarela", portion:"25 g"}
+  ],
+
+  fruits: [
+    {name:"banana", portion:"80 g"},
+    {name:"mamão", portion:"120 g"},
+    {name:"maçã", portion:"130 g"},
+    {name:"melão", portion:"120 g"},
+    {name:"laranja", portion:"150 g"}
+  ],
+
+  vegetables: [
+    {name:"alface", portion:"80 g"},
+    {name:"tomate", portion:"70 g"},
+    {name:"cenoura", portion:"100 g"},
+    {name:"repolho", portion:"100 g"},
+    {name:"brócolis", portion:"100 g"},
+    {name:"abobrinha", portion:"100 g"},
+    {name:"chuchu", portion:"100 g"}
+  ]
+};
+function getAllowedFoods(profile){
+  const normalize=t=>t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"");
+
+  const likes=normalize(profile.likes || "");
+  const dislikes=normalize(profile.dislikes || "");
+
+  const result={};
+
+  Object.keys(FOOD_DB).forEach(category=>{
+    result[category]=FOOD_DB[category].filter(food=>{
+      const name=normalize(food.name);
+
+      // Tudo que estiver na lista de exclusão é retirado.
+      if(dislikes.includes(name)) return false;
+
+      return true;
+    });
+
+    // Se a pessoa citou alimentos desejados desta categoria,
+    // eles ganham prioridade.
+   const preferred=result[category].filter(food=>
+  likes.includes(normalize(food.name))
+);
+
+if(preferred.length){
+  const others=result[category].filter(food=>
+    !likes.includes(normalize(food.name))
+  );
+
+  result[category]=[
+    ...preferred,
+    ...preferred,
+    ...preferred,
+    ...others
+  ];
+}
+  });
+
+  return result;
+}
+function generateWeeklyPlan(profile){
+  const foods=getAllowedFoods(profile);
+  const breakfastCarbs=foods.carbs.filter(food=>
+  ["pão francês","pão de forma","pão de queijo"].includes(food.name)
+);
+
+const mainCarbs=foods.carbs.filter(food=>
+  ["arroz","batata inglesa","mandioca","macarrão"].includes(food.name)
+);
+
+const breakfastProteins=foods.proteins.filter(food=>
+  ["ovos","muçarela"].includes(food.name)
+);
+
+const mainProteins=foods.proteins.filter(food=>
+  ["frango","carne bovina","carne suína","atum","peixe"].includes(food.name)
+);
+  const days=["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+
+  const pick=(list,index)=>{
+    if(!list || !list.length) return null;
+    return list[index % list.length];
+  };
+
+  const txt=(food,amount=1)=>{
+    if(!food) return "";
+    if(amount===1) return food.name+" "+food.portion;
+
+    const value=parseFloat(food.portion);
+    const unit=food.portion.replace(String(value),"").trim();
+
+    return food.name+" "+Math.round(value*amount)+" "+unit;
+  };
+
+  const weekly={};
+
+  days.forEach((day,d)=>{
+    const breakfastCarb=pick(breakfastCarbs,d);
+const snackCarb=pick(breakfastCarbs,d+1);
+
+const breakfastProtein=pick(breakfastProteins,d);
+const snackProtein=pick(breakfastProteins,d+1);
+
+const mainCarb=pick(mainCarbs,d);
+const mainCarb2=pick(mainCarbs,d+2);
+
+const mainProtein=pick(mainProteins,d);
+const mainProtein2=pick(mainProteins,d+2);
+    const fruit=pick(foods.fruits,d);
+    const fruit2=pick(foods.fruits,d+2);
+    const legume=pick(foods.legumes,d);
+    const veg=pick(foods.vegetables,d);
+const veg2=foods.vegetables.find(item=>!veg || item.name!==veg.name) || null;
+    weekly[day]=[
+      [
+  "Café da manhã",
+  [txt(breakfastCarb),txt(breakfastProtein),txt(fruit)]
+    .filter(Boolean).join("; ")
+],
+     [
+  "Lanche da manhã",
+  [txt(fruit2),txt(snackProtein,0.5)]
+    .filter(Boolean).join("; ")
+],
+      [
+  "Almoço",
+  [txt(mainCarb),txt(legume),txt(mainProtein),txt(veg),txt(veg2)]
+    .filter(Boolean).join("; ")
+],
+      [
+  "Lanche da tarde",
+  [txt(snackCarb),txt(snackProtein,0.5),txt(fruit)]
+    .filter(Boolean).join("; ")
+],
+      [
+  "Jantar",
+  [txt(mainCarb2,0.8),txt(legume),txt(mainProtein2),txt(veg2)]
+    .filter(Boolean).join("; ")
+],
+      [
+        "Ceia",
+        [txt(fruit)]
+          .filter(Boolean).join("; ")
+      ]
+    ];
+  });
+
+  return weekly;
+}
+let pendingGeneratedPlan=null;
+
+function showPlanPreview(profile){
+  pendingGeneratedPlan=generateWeeklyPlan(profile);
+
+  const box=document.getElementById("planCreator");
+
+  if(!box){
+    alert("Não foi possível abrir a prévia do cardápio.");
+    return;
+  }
+
+  const previewDays=Object.keys(pendingGeneratedPlan);
+
+  box.innerHTML=`
+    <h3>✨ Prévia do seu novo cardápio</h3>
+
+    <p class="small">
+      Meta energética estimada: <b>${profile.calories} kcal/dia</b>.<br>
+      Confira o plano antes de aplicá-lo.
+    </p>
+
+    ${previewDays.map(day=>`
+      <div class="meal" style="margin-top:12px">
+        <b>📅 ${day}</b>
+
+        ${pendingGeneratedPlan[day].map(meal=>`
+          <div style="margin-top:8px">
+            <b>${meal[0]}</b><br>
+            <span class="small">${meal[1]}</span>
+          </div>
+        `).join("")}
+      </div>
+    `).join("")}
+
+    <p class="small" style="margin-top:14px">
+      ⚠️ As quantidades são estimativas para planejamento alimentar
+      e não substituem avaliação individual de nutricionista ou médico.
+    </p>
+
+    <button class="primary" onclick="applyGeneratedPlan()">
+      ✅ Usar este cardápio
+    </button>
+
+    <button onclick="regeneratePersonalPlan()" style="margin-top:8px">
+      🔄 Gerar outra opção
+    </button>
+
+    <button onclick="openPlanCreator()" style="margin-top:8px">
+      ✏️ Ajustar meus dados
+    </button>
+  `;
+}
+function applyGeneratedPlan(){
+  if(!pendingGeneratedPlan){
+    alert("Não há um cardápio novo para aplicar.");
+    return;
+  }
+
+  Object.keys(pendingGeneratedPlan).forEach(day=>{
+    plan[day]=pendingGeneratedPlan[day];
+  });
+
+  let s=state();
+  s.customPlan=pendingGeneratedPlan;
+  put(s);
+
+  renderMenu();
+  renderMeals();
+
+  document.getElementById("planCreator").innerHTML=`
+    <h3>✅ Novo cardápio aplicado!</h3>
+    <p class="small">
+      Seu cardápio personalizado foi salvo para os 7 dias da semana.
+      Você ainda poderá alterar qualquer refeição usando
+      <b>Editar meu cardápio</b>.
+    </p>
+    <button class="primary" onclick="openPlanCreator()">
+      ✨ Criar outro cardápio
+    </button>
+  `;
+
+  pendingGeneratedPlan=null;
+
+  alert("✅ Seu novo cardápio semanal foi salvo!");
+}
+function regeneratePersonalPlan(){
+  const s=state();
+
+  if(!s.planProfile){
+    openPlanCreator();
+    return;
+  }
+
+  showPlanPreview(s.planProfile);
+}
 async function askNotifications(){
  if(!("Notification" in window)){notifStatus.textContent="Notificações não estão disponíveis neste modo do navegador.";return}
  const p=await Notification.requestPermission();
