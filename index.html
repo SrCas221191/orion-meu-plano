@@ -32,6 +32,12 @@ nav button{background:white}.active{background:#e1eee9!important;color:#174c41}
  <div class="card"><div class="row"><h2>🍽️ Refeições de hoje</h2><span id="score"></span></div><div id="meals"></div></div>
 </section>
 <section id="menu" class="hidden"><div class="card"><div class="row"><h2>📅 Cardápio semanal</h2><select id="daySelect" onchange="renderMenu()"></select></div><div id="menuMeals"></div></div></section>
+<div class="card">
+  <h2>✏️ Editar meu cardápio</h2>
+  <p class="small">Escolha o dia e altere suas refeições diretamente pelo aplicativo.</p>
+  <button class="primary" onclick="openMenuEditor()">Editar cardápio</button>
+  <div id="menuEditor" class="hidden"></div>
+</div>
 <section id="progress" class="hidden"><div class="card"><h2>⚖️ Meu progresso</h2><p>Registre seu peso quando quiser acompanhar a tendência.</p><div class="row"><input id="weight" type="number" step="0.1" placeholder="kg"><button class="primary" onclick="saveWeight()">Registrar</button></div><div id="weightHistory" style="margin-top:14px"></div></div></section>
 <section id="profile" class="hidden">
 <div class="card"><h2>🔔 Lembretes — V2.2</h2>
@@ -55,6 +61,10 @@ const plan = {
 "Sexta-feira":[["Café da manhã","Pão francês 50 g; ovos mexidos 100 g; banana 80 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de forma 50 g; muçarela 25 g; tomate 30 g"],["Almoço","Arroz 100 g; feijão 100 g; carne bovina em cubos 150 g; cenoura 100 g; salada 150 g"],["Lanche da tarde","Pão francês 50 g; carne moída 70 g; tomate 30 g"],["Jantar","Arroz 80 g; feijão 100 g; frango 150 g; repolho 100 g; salada 100 g"],["Ceia","Maçã 120 g"]],
 "Sábado":[["Café da manhã","Pão francês 50 g; ovos 100 g; muçarela 20 g; mamão 120 g; café 200 ml + 5 g de açúcar"],["Lanche da manhã","Pão de queijo 50 g; café 150 ml"],["Almoço","Arroz 100 g; feijão 100 g; bife bovino 150 g; batata inglesa 100 g; salada 150 g"],["Lanche da tarde","Pão de forma 50 g; frango desfiado 70 g; requeijão light 15 g"],["Jantar","Arroz 80 g; feijão 100 g; carne moída 130 g; cenoura + repolho 100 g; salada 100 g"],["Ceia","Melão 120 g"]]
 };
+const savedPlan=state().customPlan||{};
+Object.keys(savedPlan).forEach(d=>{
+  if(plan[d]) plan[d]=savedPlan[d];
+});
 const days=Object.keys(plan); const now=new Date(); const day=days[now.getDay()]; const dateKey=now.toISOString().slice(0,10);
 document.getElementById("today").textContent=day+" • "+now.toLocaleDateString("pt-BR");
 function state(){return JSON.parse(localStorage.getItem("orion")||"{}")} function put(s){localStorage.setItem("orion",JSON.stringify(s))}
@@ -102,6 +112,40 @@ async function savePhoto(i,file){
 function tab(id,b){document.querySelectorAll("main>section").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active")}
 daySelect.innerHTML=days.map(d=>`<option ${d==day?"selected":""}>${d}</option>`).join("");
 function renderMenu(){menuMeals.innerHTML=plan[daySelect.value].map((m,i)=>`<div class="meal"><div class="small">🕒 ${mealTimes[i]}</div><h3>${m[0]}</h3><div class="foods">${m[1]}</div></div>`).join("")}
+function openMenuEditor(){
+  const box=document.getElementById("menuEditor");
+  const d=daySelect.value;
+  box.classList.remove("hidden");
+  box.innerHTML=`
+    <h3>✏️ ${d}</h3>
+    ${plan[d].map((m,i)=>`
+      <div style="margin:12px 0">
+        <b>${mealTimes[i]} — ${m[0]}</b>
+        <textarea id="editMeal${i}" style="width:100%;min-height:70px;margin-top:6px;padding:8px;border-radius:10px;border:1px solid #dfe8e4">${m[1]}</textarea>
+      </div>
+    `).join("")}
+    <button class="primary" onclick="saveMenuEditor()">💾 Salvar alterações</button>
+  `;
+}
+function saveMenuEditor(){
+  const d=daySelect.value;
+
+  plan[d].forEach((m,i)=>{
+    const campo=document.getElementById("editMeal"+i);
+    if(campo) m[1]=campo.value.trim();
+  });
+
+  let s=state();
+  s.customPlan=s.customPlan||{};
+  s.customPlan[d]=plan[d];
+  put(s);
+
+  renderMenu();
+  renderMeals();
+  document.getElementById("menuEditor").classList.add("hidden");
+
+  alert("✅ Cardápio de "+d+" atualizado com sucesso!");
+}
 function saveWeight(){let v=parseFloat(weight.value);if(!v)return;let s=state();s.weights=s.weights||[];s.weights.push({date:new Date().toLocaleDateString("pt-BR"),value:v});put(s);weight.value="";renderWeights()}
 function renderWeights(){let a=(state().weights||[]).slice().reverse();weightHistory.innerHTML=a.length?a.map(x=>`<div class="meal"><b>${x.value.toFixed(1)} kg</b> <span class="small">— ${x.date}</span></div>`).join(""):"<span class=small>Nenhum peso registrado ainda.</span>"}
 function exportData(){let blob=new Blob([JSON.stringify(state(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="orion-meu-plano-backup.json";a.click()}
