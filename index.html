@@ -68,7 +68,37 @@ function renderMeals(){
  inp.onchange=e=>savePhoto(i,e.target.files[0]);
  });score.textContent=Object.keys(done).length+"/6 realizadas"
 }
-function savePhoto(i,file){if(!file)return;let r=new FileReader();r.onload=()=>{let s=state();s.done=s.done||{};s.done[dateKey]=s.done[dateKey]||{};s.done[dateKey][i]=true;s.photos=s.photos||{};s.photos[dateKey]=s.photos[dateKey]||{};s.photos[dateKey][i]=r.result;try{put(s)}catch(e){alert("O armazenamento do navegador ficou cheio. Use fotos menores ou exporte os registros.");}renderMeals()};r.readAsDataURL(file)}
+async function savePhoto(i,file){
+  if(!file)return;
+
+  try{
+    const bitmap=await createImageBitmap(file);
+    const max=900;
+    const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.round(bitmap.width*scale);
+    canvas.height=Math.round(bitmap.height*scale);
+
+    const ctx=canvas.getContext("2d");
+    ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+
+    const foto=canvas.toDataURL("image/jpeg",0.65);
+
+    let s=state();
+    s.done=s.done||{};
+    s.done[dateKey]=s.done[dateKey]||{};
+    s.photos=s.photos||{};
+    s.photos[dateKey]=s.photos[dateKey]||{};
+
+    s.done[dateKey][i]=1;
+    s.photos[dateKey][i]=foto;
+
+    put(s);
+    renderMeals();
+  }catch(e){
+    alert("Não foi possível salvar a foto: "+e.message);
+  }
+}
 function tab(id,b){document.querySelectorAll("main>section").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active")}
 daySelect.innerHTML=days.map(d=>`<option ${d==day?"selected":""}>${d}</option>`).join("");
 function renderMenu(){menuMeals.innerHTML=plan[daySelect.value].map((m,i)=>`<div class="meal"><div class="small">🕒 ${mealTimes[i]}</div><h3>${m[0]}</h3><div class="foods">${m[1]}</div></div>`).join("")}
